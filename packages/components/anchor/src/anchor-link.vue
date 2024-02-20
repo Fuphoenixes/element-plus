@@ -1,6 +1,6 @@
 <template>
   <div :class="ns.e('item')">
-    <a ref="linkRef" :class="cls" :href="href" @click="handleClick">
+    <a ref="linkRef" :class="cls" :href="href" @click.stop="handleClick">
       <slot>{{ title }}</slot>
     </a>
     <div

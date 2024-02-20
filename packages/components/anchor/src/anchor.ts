@@ -33,11 +33,11 @@ export const anchorProps = buildProps({
     default: 15,
   },
   /**
-   * @description Set the scroll duration of the container when the anchor is clicked, in milliseconds
+   * @description Scroll behavior
    */
-  duration: {
-    type: Number,
-    default: 300,
+  behavior: {
+    type: definePropType<ScrollBehavior>(String),
+    default: 'smooth',
   },
   /**
    * @description Whether to show the marker

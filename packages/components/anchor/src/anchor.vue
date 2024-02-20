@@ -15,19 +15,19 @@
 <script lang="ts" setup>
 import {
   computed,
-  onBeforeUnmount,
   onMounted,
   provide,
   ref,
+  toRef,
   watch,
   watchEffect,
 } from 'vue'
+import { useScroll } from '@vueuse/core'
 import { useNamespace } from '@element-plus/hooks'
 import { getOffsetTopDistance, isUndefined } from '@element-plus/utils'
 import { anchorEmits, anchorProps } from './anchor'
 import {
   anchorKey,
-  animateScrollTo,
   getElement,
   getScrollElement,
   getScrollTop,
@@ -52,8 +52,6 @@ const containerEle = ref<HTMLElement | Window>()
 const markerStyle = ref<CSSProperties>({})
 
 const links: Record<string, HTMLElement> = {}
-let isScrolling = false
-let preScrollTop = 0
 
 const ns = useNamespace('anchor')
 
@@ -79,20 +77,33 @@ const setCurrent = (href: string) => {
   }
 }
 
+let isScrolling = false
+
+const handleScroll = throttleByRaf(() => {
+  if (isScrolling) return
+  const currentHref = getCurrentHref()
+  if (!isUndefined(currentHref)) {
+    setCurrent(currentHref)
+  }
+})
+
+const { y } = useScroll(containerEle, {
+  behavior: toRef(props, 'behavior'),
+  onScroll: handleScroll,
+  onStop() {
+    isScrolling = false
+  },
+})
+
 const scrollToHref = (href: string) => {
   if (!containerEle.value) return
-  isScrolling = true
   const target = getElement(href) as HTMLElement
   if (!target) return
+  isScrolling = true
   const scrollEle = getScrollElement(target, containerEle.value)
   const distance = getOffsetTopDistance(target, scrollEle)
   const max = scrollEle.scrollHeight - scrollEle.clientHeight
-  const to = Math.min(distance - props.offset, max)
-  animateScrollTo(containerEle.value, preScrollTop, to, props.duration, () => {
-    setTimeout(() => {
-      isScrolling = false
-    }, 20)
-  })
+  y.value = Math.min(distance - props.offset, max)
 }
 
 const scrollTo = (href?: string) => {
@@ -106,17 +117,6 @@ const handleClick = (e: MouseEvent, href?: string) => {
   emit('click', e, href)
   scrollTo(href)
 }
-
-const handleScroll = throttleByRaf(() => {
-  if (containerEle.value) {
-    preScrollTop = getScrollTop(containerEle.value)
-  }
-  if (isScrolling) return
-  const currentHref = getCurrentHref()
-  if (!isUndefined(currentHref)) {
-    setCurrent(currentHref)
-  }
-})
 
 const getCurrentHref = () => {
   if (!containerEle.value) return
@@ -157,18 +157,6 @@ const getContainer = () => {
   }
 }
 
-const bindScrollEvent = () => {
-  if (containerEle.value) {
-    containerEle.value.addEventListener('scroll', handleScroll)
-  }
-}
-
-const unbindScrollEvent = () => {
-  if (containerEle.value) {
-    containerEle.value.removeEventListener('scroll', handleScroll)
-  }
-}
-
 const updateMarkerStyle = () => {
   if (!anchorRef.value || !markerRef.value) return
 
@@ -206,7 +194,6 @@ const updateMarkerStyle = () => {
 
 onMounted(() => {
   getContainer()
-  bindScrollEvent()
   const hash = decodeURIComponent(window.location.hash)
   const target = getElement(hash)
   if (target) {
@@ -216,17 +203,11 @@ onMounted(() => {
   }
 })
 
-onBeforeUnmount(() => {
-  unbindScrollEvent()
-})
-
 watch(
   () => props.container,
   (val, oldVal) => {
     if (val === oldVal) return
-    unbindScrollEvent()
     getContainer()
-    bindScrollEvent()
   }
 )
 
